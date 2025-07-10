@@ -38,7 +38,7 @@ func main() {
 		ctx.String(200, "API Gateway is working")
 	})
 
-	if err := r.Run(":8002"); err != nil {
+	if err := r.Run(":8004"); err != nil {
 		log.Fatalf("Error starting API Gateway: %v", err)
 	}
 }
