@@ -1,0 +1,169 @@
+services:
+  user:
+    build: user
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: "8000"
+      DB_USERNAME: "postgres"
+      DB_PASSWORD: "postgres"
+      DB_HOST: "postgres_container_user"
+      DB_PORT: "5432"
+      DB_NAME: "user"
+      AMQP_HOST: amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - postgres_user
+      - rabbitmq
+    links:
+      - postgres_user
+      - rabbitmq
+    restart: always
+
+  postgres_user:
+    container_name: postgres_container_user
+    image: postgres:13-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: user
+    volumes:
+      - pg_data_user:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    restart: always
+
+  survey:
+    build: survey
+    ports:
+      - "8001:8001"
+    environment:
+      PORT: "8001"
+      DB_USERNAME: "postgres"
+      DB_PASSWORD: "postgres"
+      DB_HOST: "postgres_container_survey"
+      DB_PORT: "5432"
+      DB_NAME: "survey"
+      AMQP_HOST: amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - postgres_survey
+      - rabbitmq
+    links:
+      - postgres_survey
+      - rabbitmq
+    restart: always
+
+  postgres_survey:
+    container_name: postgres_container_survey
+    image: postgres:13-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: survey
+    volumes:
+      - pg_data_survey:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    restart: always
+
+  payment:
+    build: payment
+    ports:
+      - "8002:8002"
+    environment:
+      PORT: "8002"
+      DB_USERNAME: "postgres"
+      DB_PASSWORD: "postgres"
+      DB_HOST: "postgres_container_payment"
+      DB_PORT: "5432"
+      DB_NAME: "payment"
+      AMQP_HOST: amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - postgres_payment
+      - rabbitmq
+    links:
+      - postgres_payment
+      - rabbitmq
+    restart: always
+
+  postgres_payment:
+    container_name: postgres_container_payment
+    image: postgres:13-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: payment
+    volumes:
+      - pg_data_payment:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    restart: always
+
+  responden:
+    build: responden
+    ports:
+      - "8003:8003"
+    environment:
+      PORT: "8003"
+      DB_USERNAME: "postgres"
+      DB_PASSWORD: "postgres"
+      DB_HOST: "postgres_container_responden"
+      DB_PORT: "5432"
+      DB_NAME: "responden"
+      AMQP_HOST: amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - postgres_responden
+      - rabbitmq
+    links:
+      - postgres_responden
+      - rabbitmq
+    restart: always
+
+  postgres_responden:
+    container_name: postgres_container_responden
+    image: postgres:13-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: responden
+    volumes:
+      - pg_data_responden:/var/lib/postgresql/data
+    ports:
+      - "5436:5432"
+    restart: always
+
+  api:
+    build: api
+    environment:
+      BASE_URL_USER: "http://user:8000"
+      BASE_URL_SURVEY: "http://survey:8001"
+      BASE_URL_PAYMENT: "http://payment:8002"
+      BASE_URL_RESPONDEN: "http://payment:8003"
+    volumes:
+      - ./.env:/app/.env
+    ports:
+      - "8004:8004"
+    depends_on:
+      - user
+      - survey
+      - payment
+      - responden
+    restart: always
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: "rabbitmq-local"
+    ports:
+      - 5672:5672
+      - 15672:15672
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq/
+      - rabbitmq_log:/var/log/rabbitmq
+
+volumes:
+  pg_data_user:
+  pg_data_survey:
+  pg_data_payment:
+  pg_data_responden:
+  rabbitmq_data:
+  rabbitmq_log:
+    driver: local

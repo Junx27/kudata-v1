@@ -21,11 +21,11 @@ jobs:
         run: |
           echo "🔍 Searching for Go modules..."
           for dir in $(find . -type f -name 'go.mod' -exec dirname {} \;); do
-            echo "📦 Processing module: $dir"
+            echo "Processing module: $dir"
             cd "$dir"
-            echo "🏗️ Building..."
+            echo "Building..."
             go build -v ./...
-            echo "🧪 Running tests..."
+            echo "Running tests..."
             go test -v ./...
             cd - > /dev/null
           done
