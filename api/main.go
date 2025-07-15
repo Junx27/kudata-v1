@@ -5,8 +5,12 @@ import (
 	"log"
 
 	"api/config"
+	"api/handler/payment"
+	"api/handler/responden"
 	"api/handler/survey"
 	"api/handler/user"
+	paymentRoute "api/router/payment"
+	respondenRoute "api/router/responden"
 	surveyRoute "api/router/survey"
 	userRoute "api/router/user"
 
@@ -33,6 +37,16 @@ func main() {
 		BaseURL: cfg.BaseURLSurvey,
 	}
 	surveyRoute.SurveyRoutes(r, surveyHandler)
+
+	respondenHandler := &responden.Handler{
+		BaseURL: cfg.BaseURLResponden,
+	}
+	respondenRoute.RespondenRoutes(r, respondenHandler)
+
+	paymentHandler := &payment.Handler{
+		BaseURL: cfg.BaseURLPayment,
+	}
+	paymentRoute.PaymentRoutes(r, paymentHandler)
 
 	r.GET("/", func(ctx *gin.Context) {
 		ctx.String(200, "API Gateway is working")

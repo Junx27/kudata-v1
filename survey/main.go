@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"survey/internal/survey/events"
 	"survey/pkg/database"
 	"survey/pkg/event"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,10 +21,36 @@ import (
 	"github.com/gin-contrib/cors"
 	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
 
 	_ "github.com/joho/godotenv/autoload"
 )
+
+var (
+	// WebSocket upgrader
+	upgrader = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true },
+	}
+
+	// Connected WebSocket clients
+	wsClients   = make(map[*websocket.Conn]bool)
+	wsClientsMu sync.Mutex
+)
+
+// Broadcast message to all connected clients
+func broadcastWebSocketMessage(msg string) {
+	wsClientsMu.Lock()
+	defer wsClientsMu.Unlock()
+
+	for conn := range wsClients {
+		if err := conn.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
+			log.Println("WebSocket write error:", err)
+			conn.Close()
+			delete(wsClients, conn)
+		}
+	}
+}
 
 func main() {
 	cfg, err := env.ParseAs[config.Config]()
@@ -31,23 +59,20 @@ func main() {
 	}
 
 	// init database
-	err = database.New(context.Background(), cfg)
-	if err != nil {
+	if err := database.New(context.Background(), cfg); err != nil {
 		log.Fatal(err.Error())
 	}
 
 	// migrate
-	err = database.Migrate(cfg)
-	if err != nil {
+	if err := database.Migrate(cfg); err != nil {
 		log.Fatal(err.Error())
 	}
 
-	// rabbitmq
+	// connect to RabbitMQ
 	conn, err := event.New(cfg)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-
 	defer conn.Close()
 
 	ch, err := conn.Channel()
@@ -56,33 +81,27 @@ func main() {
 	}
 	defer ch.Close()
 
+	// Declare exchange
 	err = ch.ExchangeDeclare(
 		event.ExchangeName, // name
 		"topic",            // type
-		true,               // durable
-		false,              // auto-deleted
-		false,              // internal
-		false,              // no-wait
-		nil,                // arguments
+		true, false, false, false, nil,
 	)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 
+	// setup logger
 	var logger *zap.Logger
 	var mode string
-
 	switch cfg.Env {
 	case "prod":
 		mode = gin.ReleaseMode
-		l, _ := zap.NewProduction()
-		logger = l
+		logger, _ = zap.NewProduction()
 	default:
 		mode = gin.DebugMode
-		l, _ := zap.NewDevelopment()
-		logger = l
+		logger, _ = zap.NewDevelopment()
 	}
-
 	gin.SetMode(mode)
 
 	r := gin.New()
@@ -93,23 +112,80 @@ func main() {
 	r.Use(ginzap.RecoveryWithZap(logger, true))
 	r.Use(cors.Default())
 
-	// Init Event Domain
-	// inventoryEvent := inventory.NewInventoryEvent(ch)
-	// go inventoryEvent.SubscribeTransactionPaid()
-	// go inventoryEvent.SubscribeProductIncreased()
+	// WebSocket endpoint
+	r.GET("/ws", func(c *gin.Context) {
+		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+		if err != nil {
+			log.Println("WebSocket upgrade failed:", err)
+			return
+		}
 
+		wsClientsMu.Lock()
+		wsClients[conn] = true
+		wsClientsMu.Unlock()
+
+		log.Println("WebSocket client connected")
+
+		// Listen for disconnect
+		go func() {
+			defer func() {
+				wsClientsMu.Lock()
+				delete(wsClients, conn)
+				wsClientsMu.Unlock()
+				conn.Close()
+				log.Println("WebSocket client disconnected")
+			}()
+			for {
+				if _, _, err := conn.ReadMessage(); err != nil {
+					break
+				}
+			}
+		}()
+	})
+
+	// survey events
 	surveyEvent := survey.NewSurveyEvent(ch)
 	userEvent := events.NewUserEvent(ch)
 	go userEvent.SubscribeUser()
-	go surveyEvent.SubscribeSurvey()
+	go surveyEvent.SubscribeSurvey(broadcastWebSocketMessage) // pass function
 
-	// // Init Router
+	// survey route
 	surveyHandler := survey.NewHandler(cfg, ch)
-	surveyRoter := survey.NewRouter(surveyHandler, r.RouterGroup)
-	surveyRoter.Register()
+	surveyRouter := survey.NewRouter(surveyHandler, r.RouterGroup)
+	surveyRouter.Register()
 
+	// plain HTTP GET to show latest message
 	r.GET("/", func(ctx *gin.Context) {
-		ctx.String(http.StatusOK, "survey service is working")
+		survey.MessageMu.RLock()
+		defer survey.MessageMu.RUnlock()
+
+		msg := survey.LatestMessage
+		if msg == "" {
+			ctx.String(http.StatusOK, "No message received yet")
+		} else {
+			ctx.String(http.StatusOK, "Last message: %s", msg)
+		}
+	})
+
+	r.POST("/payment", func(c *gin.Context) {
+		var payload map[string]interface{}
+
+		if err := c.BindJSON(&payload); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
+			return
+		}
+		jsonBytes, err := json.Marshal(payload)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to serialize JSON"})
+			return
+		}
+
+		broadcastWebSocketMessage(string(jsonBytes))
+
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "broadcasted",
+			"payload": payload,
+		})
 	})
 
 	srv := &http.Server{
@@ -117,12 +193,14 @@ func main() {
 		Handler: r.Handler(),
 	}
 
+	// run server
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()
 
+	// graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
@@ -131,10 +209,8 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatal("Server Shutdown: ", err)
+		log.Fatal("Server Shutdown:", err)
 	}
-
-	<-ctx.Done()
 
 	log.Println("Server exiting")
 }
