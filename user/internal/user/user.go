@@ -9,22 +9,25 @@ import (
 )
 
 type UserInput struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type UserResponse struct {
-	ID    int    `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 func StoreUser(ctx context.Context, req UserInput) error {
-	query := `INSERT INTO users (name, email) 
-			  VALUES (@name, @email)`
+	query := `INSERT INTO users (name, email, password) 
+			  VALUES (@name, @email, @password)`
 	args := pgx.NamedArgs{
-		"name":  req.Name,
-		"email": req.Email,
+		"name":     req.Name,
+		"email":    req.Email,
+		"password": req.Password,
 	}
 
 	_, err := database.DB.Exec(ctx, query, args)
@@ -37,12 +40,12 @@ func StoreUser(ctx context.Context, req UserInput) error {
 }
 
 func GetUserByID(ctx context.Context, id int) (*UserResponse, error) {
-	query := `SELECT id, name, email FROM users WHERE id = $1`
+	query := `SELECT id, name, email, password FROM users WHERE id = $1`
 
 	row := database.DB.QueryRow(ctx, query, id)
 
 	var user UserResponse
-	err := row.Scan(&user.ID, &user.Name, &user.Email)
+	err := row.Scan(&user.ID, &user.Name, &user.Email, &user.Password)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -55,7 +58,7 @@ func GetUserByID(ctx context.Context, id int) (*UserResponse, error) {
 }
 
 func GetAllUsers(ctx context.Context) ([]UserResponse, error) {
-	query := `SELECT id, name, email FROM users`
+	query := `SELECT id, name, email, password FROM users`
 
 	rows, err := database.DB.Query(ctx, query)
 	if err != nil {
@@ -68,7 +71,7 @@ func GetAllUsers(ctx context.Context) ([]UserResponse, error) {
 
 	for rows.Next() {
 		var user UserResponse
-		err := rows.Scan(&user.ID, &user.Name, &user.Email)
+		err := rows.Scan(&user.ID, &user.Name, &user.Email, &user.Password)
 		if err != nil {
 			log.Println("Error scanning user:", err)
 			return nil, err

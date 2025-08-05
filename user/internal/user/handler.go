@@ -25,8 +25,9 @@ func NewHandler(cfg config.Config, ch *amqp.Channel) Handler {
 }
 
 type createUserRequest struct {
-	Name  string `json:"name" binding:"required"`
-	Email string `json:"email" binding:"required,email"`
+	Name     string `json:"name" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required"`
 }
 
 func (h *Handler) CreateUser(c *gin.Context) {
@@ -37,8 +38,9 @@ func (h *Handler) CreateUser(c *gin.Context) {
 	}
 
 	user := UserInput{
-		Name:  req.Name,
-		Email: req.Email,
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: req.Password,
 	}
 
 	err := StoreUser(context.Background(), user)
