@@ -2,11 +2,16 @@ package survey
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"path/filepath"
 	"strconv"
+	"time"
+
 	"survey/internal/config"
 
 	"github.com/gin-gonic/gin"
+	"github.com/minio/minio-go/v7"
 	"github.com/streadway/amqp"
 )
 
@@ -23,23 +28,57 @@ func NewHandler(cfg config.Config, ch *amqp.Channel) Handler {
 }
 
 type createSurveyRequest struct {
-	Name        string `json:"name" binding:"required"`
-	Description string `json:"description" binding:"required"`
+	Name        string `form:"name" binding:"required"`
+	Price       int    `form:"price" binding:"required"`
+	Description string `form:"description" binding:"required"`
 }
 
 func (h *Handler) CreateSurvey(c *gin.Context) {
 	var req createSurveyRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Ambil file image
+	file, err := c.FormFile("image")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Image is required"})
+		return
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open image"})
+		return
+	}
+	defer src.Close()
+
+	// Generate unique object name
+	objectName := fmt.Sprintf("%d%s", time.Now().UnixNano(), filepath.Ext(file.Filename))
+
+	// Upload ke MinIO
+	_, err = config.MinioClient.PutObject(context.Background(),
+		h.cfg.MinioBucket,
+		objectName,
+		src,
+		file.Size,
+		minio.PutObjectOptions{ContentType: file.Header.Get("Content-Type")},
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image"})
+		return
+	}
+
+	imageURL := objectName
+
 	survey := SurveyInput{
 		Name:        req.Name,
+		Price:       req.Price,
 		Description: req.Description,
 	}
 
-	err := StoreSurvey(context.Background(), survey)
+	err = StoreSurvey(context.Background(), survey, imageURL)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store survey"})
 		return
@@ -52,7 +91,7 @@ func (h *Handler) GetSurveyByID(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.Atoi(idParam)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid survey id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid survey ID"})
 		return
 	}
 
@@ -70,14 +109,13 @@ func (h *Handler) GetSurveyByID(c *gin.Context) {
 }
 
 func (h *Handler) GetAllSurvey(c *gin.Context) {
-
 	surveys, err := GetAllSurveys(context.Background())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get surveys"})
 		return
 	}
-	if surveys == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Survey not found"})
+	if len(surveys) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No surveys found"})
 		return
 	}
 

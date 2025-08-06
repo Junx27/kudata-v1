@@ -45,7 +45,7 @@ func (h *Handler) CreateUser(c *gin.Context) {
 
 	err := StoreUser(context.Background(), user)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store user"})
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Create user failed, please try again!"})
 		return
 	}
 

@@ -44,12 +44,20 @@ services:
       DB_PORT: "5432"
       DB_NAME: "survey"
       AMQP_HOST: amqp://guest:guest@rabbitmq:5672/
+      MINIO_HOST: "minio:9000"
+      MINIO_PORT: "9000"
+      MINIO_ACCESS_KEY: "minioadmin"
+      MINIO_SECRET_KEY: "minioadmin"
+      MINIO_BUCKET: "survey-images"
+      MINIO_USE_SSL: "false"
     depends_on:
       - postgres_survey
       - rabbitmq
+      - minio
     links:
       - postgres_survey
       - rabbitmq
+      - minio
     restart: always
 
   postgres_survey:
@@ -159,11 +167,26 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq/
       - rabbitmq_log:/var/log/rabbitmq
 
+  minio:
+    image: minio/minio
+    container_name: minio
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # Console UI
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server --console-address ":9001" /data
+    volumes:
+      - minio_data:/data
+    restart: always
+
 volumes:
   pg_data_user:
   pg_data_survey:
   pg_data_payment:
   pg_data_responden:
   rabbitmq_data:
+  minio_data:
   rabbitmq_log:
     driver: local

@@ -67,6 +67,10 @@ func main() {
 	if err := database.Migrate(cfg); err != nil {
 		log.Fatal(err.Error())
 	}
+	config.AppConfig = cfg
+
+	// Init MinIO (penting!)
+	config.InitMinio()
 
 	// connect to RabbitMQ
 	conn, err := event.New(cfg)
