@@ -10,5 +10,6 @@ func SurveyRoutes(r *gin.Engine, h *survey.Handler) {
 	api := r.Group("/api")
 	{
 		api.GET("/surveys", h.GetAllSurvey)
+		api.GET("/categories", h.GetAllSurveyCategories)
 	}
 }

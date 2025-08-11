@@ -18,4 +18,6 @@ func (r *Router) Register() {
 	r.group.GET("/survey/:id", r.handler.GetSurveyByID)
 	r.group.POST("/survey", r.handler.CreateSurvey)
 	r.group.GET("/survey", r.handler.GetAllSurvey)
+	r.group.GET("/categories", r.handler.GetAllCategories)
+
 }

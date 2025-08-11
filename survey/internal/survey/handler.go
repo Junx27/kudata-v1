@@ -31,6 +31,7 @@ type createSurveyRequest struct {
 	Name        string `form:"name" binding:"required"`
 	Price       int    `form:"price" binding:"required"`
 	Description string `form:"description" binding:"required"`
+	CategoryID  int    `form:"category_id" binding:"required"`
 }
 
 func (h *Handler) CreateSurvey(c *gin.Context) {
@@ -76,6 +77,7 @@ func (h *Handler) CreateSurvey(c *gin.Context) {
 		Name:        req.Name,
 		Price:       req.Price,
 		Description: req.Description,
+		CategoryID:  req.CategoryID,
 	}
 
 	err = StoreSurvey(context.Background(), survey, imageURL)
@@ -109,15 +111,46 @@ func (h *Handler) GetSurveyByID(c *gin.Context) {
 }
 
 func (h *Handler) GetAllSurvey(c *gin.Context) {
-	surveys, err := GetAllSurveys(context.Background())
+	// Ambil query param
+	categoryIDStr := c.Query("category_id")
+	name := c.Query("name")
+
+	// Parse category_id jika ada
+	var categoryID int
+	if categoryIDStr != "" {
+		var err error
+		categoryID, err = strconv.Atoi(categoryIDStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category_id"})
+			return
+		}
+	}
+
+	// Panggil service dengan filter
+	surveys, err := GetAllSurveys(context.Background(), categoryID, name)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get surveys"})
 		return
 	}
+
 	if len(surveys) == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "No surveys found"})
 		return
 	}
 
 	c.JSON(http.StatusOK, surveys)
+}
+
+func (h *Handler) GetAllCategories(c *gin.Context) {
+	categories, err := GetAllCategories(context.Background())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get categories"})
+		return
+	}
+	if len(categories) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No categories found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, categories)
 }

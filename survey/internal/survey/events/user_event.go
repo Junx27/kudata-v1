@@ -1,10 +1,7 @@
 package events
 
 import (
-	"context"
-	"encoding/json"
 	"log"
-	"survey/internal/survey"
 	"survey/pkg/event"
 
 	"github.com/streadway/amqp"
@@ -64,37 +61,4 @@ func (ue *UserEvent) SubscribeUser() {
 
 func (ue *UserEvent) handleConsumeSomething(msg amqp.Delivery) {
 	log.Printf("Received message from user service: %s", string(msg.Body))
-	log.Printf("Message properties - ReplyTo: %s, CorrelationId: %s", msg.ReplyTo, msg.CorrelationId)
-
-	ctx := context.Background()
-	surveys, err := survey.GetAllSurveys(ctx)
-	if err != nil {
-		log.Printf("Error retrieving surveys: %v", err)
-		return
-	}
-	log.Printf("Successfully retrieved %d surveys", len(surveys))
-
-	responseBody, err := json.Marshal(surveys)
-	if err != nil {
-		log.Printf("Failed to marshal survey response: %v", err)
-		return
-	}
-	log.Printf("Marshalled survey response size: %d bytes", len(responseBody))
-
-	err = ue.Channel.Publish(
-		event.ExchangeName,
-		msg.ReplyTo,
-		false,
-		false,
-		amqp.Publishing{
-			ContentType:   "application/json",
-			CorrelationId: msg.CorrelationId,
-			Body:          responseBody,
-		},
-	)
-	if err != nil {
-		log.Printf("Failed to publish survey response: %v", err)
-	} else {
-		log.Printf("Published survey response to exchange '%s' with routing key '%s'", event.ExchangeName, msg.ReplyTo)
-	}
 }

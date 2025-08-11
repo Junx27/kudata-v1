@@ -38,8 +38,25 @@ func (h *Handler) GetAllSurvey(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"message": "success",
-		"data":    surveys,
-	})
+	c.JSON(http.StatusOK, surveys)
+}
+func (h *Handler) GetAllSurveyCategories(c *gin.Context) {
+
+	url := fmt.Sprintf("%s%s", h.BaseURL, "/categories")
+	resp, err := http.Get(url)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to fetch surveys"})
+		return
+	}
+	surveys, err := h.decodeResponseBody(resp)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, surveys)
 }
