@@ -22,6 +22,28 @@ func StoreSurvey(ctx context.Context, req model.SurveyInput, imageURL string) er
 	return nil
 }
 
+func UpdateSurvey(ctx context.Context, id int, req model.SurveyInput, imageURL string) error {
+	query := `UPDATE surveys 
+			  SET name = $1, image = $2, price = $3, description = $4, category_id = $5
+			  WHERE id = $6`
+	_, err := database.DB.Exec(ctx, query, req.Name, imageURL, req.Price, req.Description, req.CategoryID, id)
+	if err != nil {
+		log.Println("Error updating survey:", err)
+		return err
+	}
+	return nil
+}
+
+func DeleteSurvey(ctx context.Context, id int) error {
+	query := `DELETE FROM surveys WHERE id = $1`
+	_, err := database.DB.Exec(ctx, query, id)
+	if err != nil {
+		log.Println("Error deleting survey:", err)
+		return err
+	}
+	return nil
+}
+
 func GetSurveyByID(ctx context.Context, id int) (*model.SurveyResponse, error) {
 	query := `
 		SELECT s.id, s.name, s.image, s.price, s.description, c.name AS category
@@ -54,9 +76,10 @@ func GetSurveyByID(ctx context.Context, id int) (*model.SurveyResponse, error) {
 	if config.AppConfig.MinioHost == "minio:9000" {
 		url = "localhost:9000"
 	}
-	survey.Image = fmt.Sprintf("http://%s/%s/%s",
+	survey.Image = fmt.Sprintf("http://%s/%s/%s/%s",
 		url,
 		config.AppConfig.MinioBucket,
+		"survey",
 		survey.Image,
 	)
 
@@ -114,9 +137,10 @@ func GetAllSurveys(ctx context.Context, categoryID int, name string) ([]model.Su
 		if config.AppConfig.MinioHost == "minio:9000" {
 			url = "localhost:9000"
 		}
-		survey.Image = fmt.Sprintf("http://%s/%s/%s",
+		survey.Image = fmt.Sprintf("http://%s/%s/%s/%s",
 			url,
 			config.AppConfig.MinioBucket,
+			"survey",
 			survey.Image,
 		)
 

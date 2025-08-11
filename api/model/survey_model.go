@@ -7,6 +7,7 @@ type CreateSurveyRequest struct {
 	CategoryID  int    `form:"category_id" binding:"required"`
 }
 type MessageSurvey struct {
+	ID          int    `json:"id"`
 	Name        string `json:"name"`
 	Price       int    `json:"price"`
 	Description string `json:"description"`

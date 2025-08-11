@@ -150,8 +150,10 @@ func main() {
 
 	// survey events
 	userEvent := events.NewUserEvent(ch)
-	createSurveyEvent := events.NewCreateSurveyEvent(ch)
-	go createSurveyEvent.SubscribeCreateSurvey()
+	surveyEvent := events.NewSurveyEvent(ch)
+	go surveyEvent.SubscribeCreateSurvey()
+	go surveyEvent.SubscribeUpdateSurvey()
+	go surveyEvent.SubscribeDeleteSurvey()
 	go userEvent.SubscribeUser()
 
 	// survey route

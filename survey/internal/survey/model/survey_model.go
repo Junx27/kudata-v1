@@ -28,7 +28,8 @@ type CategoryResponse struct {
 	Name string `json:"name"`
 }
 
-type CreateSurveyEvent struct {
+type SurveyEvent struct {
+	ID          int    `json:"id"`
 	Name        string `json:"name"`
 	Price       int    `json:"price"`
 	Description string `json:"description"`
