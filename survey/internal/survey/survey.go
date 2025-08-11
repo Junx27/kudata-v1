@@ -105,7 +105,7 @@ func GetSurveyByID(ctx context.Context, id int) (*SurveyResponse, error) {
 	// Format image URL
 	url := config.AppConfig.MinioHost
 	if config.AppConfig.MinioHost == "minio:9000" {
-		url = "192.168.1.4:9000"
+		url = "localhost:9000"
 	}
 	survey.Image = fmt.Sprintf("http://%s/%s/%s",
 		url,
@@ -165,7 +165,7 @@ func GetAllSurveys(ctx context.Context, categoryID int, name string) ([]SurveyRe
 
 		url := config.AppConfig.MinioHost
 		if config.AppConfig.MinioHost == "minio:9000" {
-			url = "192.168.1.4:9000"
+			url = "localhost:9000"
 		}
 		survey.Image = fmt.Sprintf("http://%s/%s/%s",
 			url,
