@@ -1,4 +1,4 @@
-package user
+package handler
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strconv"
 	"user/internal/config"
+	"user/internal/user/model"
+	"user/internal/user/repository"
 	"user/pkg/event"
 
 	"github.com/gin-gonic/gin"
@@ -24,26 +26,20 @@ func NewHandler(cfg config.Config, ch *amqp.Channel) Handler {
 	}
 }
 
-type createUserRequest struct {
-	Name     string `json:"name" binding:"required"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
-}
-
 func (h *Handler) CreateUser(c *gin.Context) {
-	var req createUserRequest
+	var req model.CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	user := UserInput{
+	user := model.UserInput{
 		Name:     req.Name,
 		Email:    req.Email,
 		Password: req.Password,
 	}
 
-	err := StoreUser(context.Background(), user)
+	err := repository.StoreUser(context.Background(), user)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Create user failed, please try again!"})
 		return
@@ -68,7 +64,7 @@ func (h *Handler) GetUserByID(c *gin.Context) {
 		return
 	}
 
-	user, err := GetUserByID(context.Background(), id)
+	user, err := repository.GetUserByID(context.Background(), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
 		return
@@ -83,7 +79,7 @@ func (h *Handler) GetUserByID(c *gin.Context) {
 
 func (h *Handler) GetAllUsers(c *gin.Context) {
 
-	user, err := GetAllUsers(context.Background())
+	user, err := repository.GetAllUsers(context.Background())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
 		return

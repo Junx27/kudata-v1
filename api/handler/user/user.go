@@ -1,6 +1,9 @@
 package user
 
 import (
+	"api/config"
+	"api/event"
+	"api/model"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -8,10 +11,21 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/streadway/amqp"
 )
 
 type Handler struct {
+	cfg     config.Config
+	ch      *amqp.Channel
 	BaseURL string
+}
+
+func NewHandler(cfg config.Config, ch *amqp.Channel, baseURL string) Handler {
+	return Handler{
+		cfg:     cfg,
+		ch:      ch,
+		BaseURL: baseURL,
+	}
 }
 
 func (h *Handler) decodeResponseBody(resp *http.Response) ([]map[string]interface{}, error) {
@@ -20,6 +34,28 @@ func (h *Handler) decodeResponseBody(resp *http.Response) ([]map[string]interfac
 		return nil, fmt.Errorf("Error decoding response body: %v", err)
 	}
 	return surveys, nil
+}
+func (h *Handler) CreateUser(c *gin.Context) {
+	var req model.CreateUserRequest
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user := model.MessageUser{
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: req.Password,
+	}
+
+	userData, err := json.Marshal(user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Unmarshal error"})
+		return
+	}
+	err = event.Publisher(h.ch, "create.user", userData)
+	c.JSON(http.StatusCreated, gin.H{"message": "User created successfully"})
+
 }
 func (h *Handler) GetAllUsers(c *gin.Context) {
 
@@ -45,12 +81,6 @@ func (h *Handler) GetAllUsers(c *gin.Context) {
 	})
 }
 
-type User struct {
-	ID    int    `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
-}
-
 func (h *Handler) GetUserById(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.Atoi(idParam)
@@ -73,7 +103,7 @@ func (h *Handler) GetUserById(c *gin.Context) {
 		return
 	}
 
-	var user User
+	var user model.UseResponse
 	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "Error decoding user", "error": err.Error()})
 		return

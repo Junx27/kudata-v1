@@ -1,13 +1,17 @@
-package user
+package router
 
-import "github.com/gin-gonic/gin"
+import (
+	"user/internal/user/handler"
+
+	"github.com/gin-gonic/gin"
+)
 
 type Router struct {
-	handler Handler
+	handler handler.Handler
 	group   gin.RouterGroup
 }
 
-func NewRouter(handler Handler, group gin.RouterGroup) Router {
+func NewRouter(handler handler.Handler, group gin.RouterGroup) Router {
 	return Router{
 		handler: handler,
 		group:   group,

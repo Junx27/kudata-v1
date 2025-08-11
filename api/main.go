@@ -46,10 +46,8 @@ func main() {
 
 	r := gin.Default()
 
-	userHandler := &user.Handler{
-		BaseURL: cfg.BaseURLUser,
-	}
-	userRoute.UserRoutes(r, userHandler)
+	userHandler := user.NewHandler(cfg, ch, cfg.BaseURLUser)
+	userRoute.UserRoutes(r, &userHandler)
 
 	surveyHandler := survey.NewHandler(cfg, ch, cfg.BaseURLSurvey)
 	surveyRoute.SurveyRoutes(r, &surveyHandler)

@@ -141,6 +141,8 @@ services:
   # API Instances (2 active + 1 backup)
   api1:
     build: api
+    ports:
+      - "8004:8004"
     expose:
       - "8004"
     environment:
@@ -163,29 +165,29 @@ services:
     networks:
       - backend
 
-  api2:
-    build: api
-    expose:
-      - "8004"
-    environment:
-      PORT: "8004"
-      BASE_URL_USER: "http://user:8000"
-      BASE_URL_SURVEY: "http://survey:8001"
-      BASE_URL_PAYMENT: "http://payment:8002"
-      BASE_URL_RESPONDEN: "http://responden:8003"
-      AMQP_HOST: amqp://guest:guest@rabbitmq:5672/
-      MINIO_HOST: "minio:9000"
-      MINIO_PORT: "9000"
-      MINIO_ACCESS_KEY: "minioadmin"
-      MINIO_SECRET_KEY: "minioadmin"
-      MINIO_BUCKET: "images"
-      MINIO_USE_SSL: "false"
-    depends_on:
-      - rabbitmq
-      - minio
-    restart: always
-    networks:
-      - backend
+  # api2:
+  #   build: api
+  #   expose:
+  #     - "8004"
+  #   environment:
+  #     PORT: "8004"
+  #     BASE_URL_USER: "http://user:8000"
+  #     BASE_URL_SURVEY: "http://survey:8001"
+  #     BASE_URL_PAYMENT: "http://payment:8002"
+  #     BASE_URL_RESPONDEN: "http://responden:8003"
+  #     AMQP_HOST: amqp://guest:guest@rabbitmq:5672/
+  #     MINIO_HOST: "minio:9000"
+  #     MINIO_PORT: "9000"
+  #     MINIO_ACCESS_KEY: "minioadmin"
+  #     MINIO_SECRET_KEY: "minioadmin"
+  #     MINIO_BUCKET: "images"
+  #     MINIO_USE_SSL: "false"
+  #   depends_on:
+  #     - rabbitmq
+  #     - minio
+  #   restart: always
+  #   networks:
+  #     - backend
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -215,20 +217,20 @@ services:
     networks:
       - backend
 
-  nginx:
-    image: nginx:stable
-    container_name: nginx-reverse-proxy
-    ports:
-      - "443:443"
-    volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - api1
-      - api2
-    restart: always
-    networks:
-      - backend
+  # nginx:
+  #   image: nginx:stable
+  #   container_name: nginx-reverse-proxy
+  #   ports:
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx/conf.d:/etc/nginx/conf.d:ro
+  #     - ./nginx/ssl:/etc/nginx/ssl:ro
+  #   depends_on:
+  #     - api1
+  #     - api2
+  #   restart: always
+  #   networks:
+  #     - backend
 
 volumes:
   pg_data_user:

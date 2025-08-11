@@ -1,27 +1,15 @@
-package user
+package repository
 
 import (
 	"context"
 	"log"
+	"user/internal/user/model"
 	"user/pkg/database"
 
 	"github.com/jackc/pgx/v5"
 )
 
-type UserInput struct {
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-type UserResponse struct {
-	ID       int    `json:"id"`
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-func StoreUser(ctx context.Context, req UserInput) error {
+func StoreUser(ctx context.Context, req model.UserInput) error {
 	query := `INSERT INTO users (name, email, password) 
 			  VALUES (@name, @email, @password)`
 	args := pgx.NamedArgs{
@@ -39,12 +27,12 @@ func StoreUser(ctx context.Context, req UserInput) error {
 	return nil
 }
 
-func GetUserByID(ctx context.Context, id int) (*UserResponse, error) {
+func GetUserByID(ctx context.Context, id int) (*model.UserResponse, error) {
 	query := `SELECT id, name, email, password FROM users WHERE id = $1`
 
 	row := database.DB.QueryRow(ctx, query, id)
 
-	var user UserResponse
+	var user model.UserResponse
 	err := row.Scan(&user.ID, &user.Name, &user.Email, &user.Password)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -57,7 +45,7 @@ func GetUserByID(ctx context.Context, id int) (*UserResponse, error) {
 	return &user, nil
 }
 
-func GetAllUsers(ctx context.Context) ([]UserResponse, error) {
+func GetAllUsers(ctx context.Context) ([]model.UserResponse, error) {
 	query := `SELECT id, name, email, password FROM users`
 
 	rows, err := database.DB.Query(ctx, query)
@@ -67,10 +55,10 @@ func GetAllUsers(ctx context.Context) ([]UserResponse, error) {
 	}
 	defer rows.Close()
 
-	var users []UserResponse
+	var users []model.UserResponse
 
 	for rows.Next() {
-		var user UserResponse
+		var user model.UserResponse
 		err := rows.Scan(&user.ID, &user.Name, &user.Email, &user.Password)
 		if err != nil {
 			log.Println("Error scanning user:", err)

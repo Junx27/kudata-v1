@@ -10,8 +10,9 @@ import (
 	"syscall"
 	"time"
 	"user/internal/config"
-	"user/internal/user"
 	"user/internal/user/events"
+	"user/internal/user/handler"
+	"user/internal/user/router"
 	"user/pkg/database"
 	"user/pkg/event"
 
@@ -98,14 +99,12 @@ func main() {
 	// go inventoryEvent.SubscribeTransactionPaid()
 	// go inventoryEvent.SubscribeProductIncreased()
 
-	userEvent := user.NewUserEvent(ch)
-	surveyEvent := events.NewSurveyEvent(ch)
-	go surveyEvent.SubscribeSurvey()
-	go userEvent.SubscribeUser()
+	userEvent := events.NewUserEvent(ch)
+	go userEvent.SubscribeCreateUser()
 
 	// // Init Router
-	userHandler := user.NewHandler(cfg, ch)
-	userRouter := user.NewRouter(userHandler, r.RouterGroup)
+	userHandler := handler.NewHandler(cfg, ch)
+	userRouter := router.NewRouter(userHandler, r.RouterGroup)
 	userRouter.Register()
 
 	r.GET("/", func(ctx *gin.Context) {
