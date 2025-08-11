@@ -9,8 +9,9 @@ import (
 	"os"
 	"os/signal"
 	"survey/internal/config"
-	"survey/internal/survey"
 	"survey/internal/survey/events"
+	"survey/internal/survey/handler"
+	"survey/internal/survey/router"
 	"survey/pkg/database"
 	"survey/pkg/event"
 	"sync"
@@ -148,27 +149,18 @@ func main() {
 	})
 
 	// survey events
-	surveyEvent := survey.NewSurveyEvent(ch)
 	userEvent := events.NewUserEvent(ch)
+	createSurveyEvent := events.NewCreateSurveyEvent(ch)
+	go createSurveyEvent.SubscribeCreateSurvey()
 	go userEvent.SubscribeUser()
-	go surveyEvent.SubscribeSurvey(broadcastWebSocketMessage) // pass function
 
 	// survey route
-	surveyHandler := survey.NewHandler(cfg, ch)
-	surveyRouter := survey.NewRouter(surveyHandler, r.RouterGroup)
+	surveyHandler := handler.NewHandler(cfg, ch)
+	surveyRouter := router.NewRouter(surveyHandler, r.RouterGroup)
 	surveyRouter.Register()
 
-	// plain HTTP GET to show latest message
 	r.GET("/", func(ctx *gin.Context) {
-		survey.MessageMu.RLock()
-		defer survey.MessageMu.RUnlock()
-
-		msg := survey.LatestMessage
-		if msg == "" {
-			ctx.String(http.StatusOK, "No message received yet")
-		} else {
-			ctx.String(http.StatusOK, "Last message: %s", msg)
-		}
+		ctx.JSON(http.StatusOK, gin.H{"message": "Survey service is working"})
 	})
 
 	r.POST("/payment", func(c *gin.Context) {

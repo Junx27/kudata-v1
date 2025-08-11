@@ -33,8 +33,6 @@ services:
       POSTGRES_DB: user
     volumes:
       - pg_data_user:/var/lib/postgresql/data
-    ports:
-      - "5433:5432"
     restart: always
     networks:
       - backend
@@ -55,7 +53,7 @@ services:
       MINIO_PORT: "9000"
       MINIO_ACCESS_KEY: "minioadmin"
       MINIO_SECRET_KEY: "minioadmin"
-      MINIO_BUCKET: "survey-images"
+      MINIO_BUCKET: "images"
       MINIO_USE_SSL: "false"
     depends_on:
       - postgres_survey
@@ -74,8 +72,6 @@ services:
       POSTGRES_DB: survey
     volumes:
       - pg_data_survey:/var/lib/postgresql/data
-    ports:
-      - "5434:5432"
     restart: always
     networks:
       - backend
@@ -108,16 +104,12 @@ services:
       POSTGRES_DB: payment
     volumes:
       - pg_data_payment:/var/lib/postgresql/data
-    ports:
-      - "5435:5432"
     restart: always
     networks:
       - backend
 
   responden:
     build: responden
-    ports:
-      - "8003:8003"
     environment:
       PORT: "8003"
       DB_USERNAME: "postgres"
@@ -142,60 +134,56 @@ services:
       POSTGRES_DB: responden
     volumes:
       - pg_data_responden:/var/lib/postgresql/data
-    ports:
-      - "5436:5432"
     restart: always
     networks:
       - backend
 
-  # API Instances (4 active + 1 backup)
+  # API Instances (2 active + 1 backup)
   api1:
     build: api
+    expose:
+      - "8004"
     environment:
+      PORT: "8004"
       BASE_URL_USER: "http://user:8000"
       BASE_URL_SURVEY: "http://survey:8001"
       BASE_URL_PAYMENT: "http://payment:8002"
       BASE_URL_RESPONDEN: "http://responden:8003"
+      AMQP_HOST: amqp://guest:guest@rabbitmq:5672/
+      MINIO_HOST: "minio:9000"
+      MINIO_PORT: "9000"
+      MINIO_ACCESS_KEY: "minioadmin"
+      MINIO_SECRET_KEY: "minioadmin"
+      MINIO_BUCKET: "images"
+      MINIO_USE_SSL: "false"
+    depends_on:
+      - rabbitmq
+      - minio
+    restart: always
     networks:
       - backend
 
   api2:
     build: api
+    expose:
+      - "8004"
     environment:
+      PORT: "8004"
       BASE_URL_USER: "http://user:8000"
       BASE_URL_SURVEY: "http://survey:8001"
       BASE_URL_PAYMENT: "http://payment:8002"
       BASE_URL_RESPONDEN: "http://responden:8003"
-    networks:
-      - backend
-
-  api3:
-    build: api
-    environment:
-      BASE_URL_USER: "http://user:8000"
-      BASE_URL_SURVEY: "http://survey:8001"
-      BASE_URL_PAYMENT: "http://payment:8002"
-      BASE_URL_RESPONDEN: "http://responden:8003"
-    networks:
-      - backend
-
-  api4:
-    build: api
-    environment:
-      BASE_URL_USER: "http://user:8000"
-      BASE_URL_SURVEY: "http://survey:8001"
-      BASE_URL_PAYMENT: "http://payment:8002"
-      BASE_URL_RESPONDEN: "http://responden:8003"
-    networks:
-      - backend
-
-  api5:
-    build: api
-    environment:
-      BASE_URL_USER: "http://user:8000"
-      BASE_URL_SURVEY: "http://survey:8001"
-      BASE_URL_PAYMENT: "http://payment:8002"
-      BASE_URL_RESPONDEN: "http://responden:8003"
+      AMQP_HOST: amqp://guest:guest@rabbitmq:5672/
+      MINIO_HOST: "minio:9000"
+      MINIO_PORT: "9000"
+      MINIO_ACCESS_KEY: "minioadmin"
+      MINIO_SECRET_KEY: "minioadmin"
+      MINIO_BUCKET: "images"
+      MINIO_USE_SSL: "false"
+    depends_on:
+      - rabbitmq
+      - minio
+    restart: always
     networks:
       - backend
 
@@ -238,10 +226,6 @@ services:
     depends_on:
       - api1
       - api2
-      - api3
-      - api4
-      - api5
-      - minio
     restart: always
     networks:
       - backend
@@ -254,4 +238,3 @@ volumes:
   rabbitmq_data:
   minio_data:
   rabbitmq_log:
-    driver: local

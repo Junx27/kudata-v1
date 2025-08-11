@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 
 	"api/config"
+	"api/event"
 	"api/handler/payment"
 	"api/handler/responden"
 	"api/handler/survey"
@@ -26,6 +28,22 @@ func main() {
 		fmt.Printf("%+v\n", err)
 	}
 
+	config.AppConfig = cfg
+	config.InitMinio()
+
+	// connect to RabbitMQ
+	conn, err := event.New(cfg)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	defer conn.Close()
+
+	ch, err := conn.Channel()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	defer ch.Close()
+
 	r := gin.Default()
 
 	userHandler := &user.Handler{
@@ -33,10 +51,8 @@ func main() {
 	}
 	userRoute.UserRoutes(r, userHandler)
 
-	surveyHandler := &survey.Handler{
-		BaseURL: cfg.BaseURLSurvey,
-	}
-	surveyRoute.SurveyRoutes(r, surveyHandler)
+	surveyHandler := survey.NewHandler(cfg, ch, cfg.BaseURLSurvey)
+	surveyRoute.SurveyRoutes(r, &surveyHandler)
 
 	respondenHandler := &responden.Handler{
 		BaseURL: cfg.BaseURLResponden,
@@ -48,8 +64,8 @@ func main() {
 	}
 	paymentRoute.PaymentRoutes(r, paymentHandler)
 
-	r.GET("/", func(ctx *gin.Context) {
-		ctx.String(200, "API Gateway is working")
+	r.GET("/api/status-service", func(ctx *gin.Context) {
+		ctx.JSON(http.StatusOK, gin.H{"message": "API service is working"})
 	})
 
 	if err := r.Run(":8004"); err != nil {

@@ -1,40 +1,17 @@
-package survey
+package repository
 
 import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"survey/internal/config"
+	"survey/internal/survey/model"
 	"survey/pkg/database"
-	"survey/pkg/storage"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 )
 
-type SurveyInput struct {
-	Name        string `form:"name" binding:"required"`
-	Price       int    `form:"price" binding:"required"`
-	Description string `form:"description" binding:"required"`
-	CategoryID  int    `form:"category_id" binding:"required"`
-}
-
-type SurveyResponse struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Image       string `json:"image"`
-	Price       int    `json:"price"`
-	Description string `json:"description"`
-	Category    string `json:"category"`
-}
-
-type CategoryResponse struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
-}
-
-func StoreSurvey(ctx context.Context, req SurveyInput, imageURL string) error {
+func StoreSurvey(ctx context.Context, req model.SurveyInput, imageURL string) error {
 	query := `INSERT INTO surveys (name, image, price, description, category_id) 
 			  VALUES ($1, $2, $3, $4, $5)`
 	_, err := database.DB.Exec(ctx, query, req.Name, imageURL, req.Price, req.Description, req.CategoryID)
@@ -45,37 +22,7 @@ func StoreSurvey(ctx context.Context, req SurveyInput, imageURL string) error {
 	return nil
 }
 
-func CreateSurveyHandler(c *gin.Context) {
-	var input SurveyInput
-	if err := c.ShouldBind(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	file, fileHeader, err := c.Request.FormFile("image")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "image is required"})
-		return
-	}
-
-	imageURL, err := storage.UploadImageToMinio(file, fileHeader)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to upload image"})
-		return
-	}
-
-	if err := StoreSurvey(c.Request.Context(), input, imageURL); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store survey"})
-		return
-	}
-
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "survey created successfully",
-		"image":   imageURL,
-	})
-}
-
-func GetSurveyByID(ctx context.Context, id int) (*SurveyResponse, error) {
+func GetSurveyByID(ctx context.Context, id int) (*model.SurveyResponse, error) {
 	query := `
 		SELECT s.id, s.name, s.image, s.price, s.description, c.name AS category
 		FROM surveys s
@@ -85,7 +32,7 @@ func GetSurveyByID(ctx context.Context, id int) (*SurveyResponse, error) {
 
 	row := database.DB.QueryRow(ctx, query, id)
 
-	var survey SurveyResponse
+	var survey model.SurveyResponse
 	err := row.Scan(
 		&survey.ID,
 		&survey.Name,
@@ -116,7 +63,7 @@ func GetSurveyByID(ctx context.Context, id int) (*SurveyResponse, error) {
 	return &survey, nil
 }
 
-func GetAllSurveys(ctx context.Context, categoryID int, name string) ([]SurveyResponse, error) {
+func GetAllSurveys(ctx context.Context, categoryID int, name string) ([]model.SurveyResponse, error) {
 	query := `
 		SELECT s.id, s.name, s.image, s.price, s.description, c.name AS category
 		FROM surveys s
@@ -146,10 +93,10 @@ func GetAllSurveys(ctx context.Context, categoryID int, name string) ([]SurveyRe
 	}
 	defer rows.Close()
 
-	var surveys []SurveyResponse
+	var surveys []model.SurveyResponse
 
 	for rows.Next() {
-		var survey SurveyResponse
+		var survey model.SurveyResponse
 		err := rows.Scan(
 			&survey.ID,
 			&survey.Name,
@@ -184,7 +131,7 @@ func GetAllSurveys(ctx context.Context, categoryID int, name string) ([]SurveyRe
 	return surveys, nil
 }
 
-func GetAllCategories(ctx context.Context) ([]CategoryResponse, error) {
+func GetAllCategories(ctx context.Context) ([]model.CategoryResponse, error) {
 	query := `SELECT id, name FROM categories`
 
 	rows, err := database.DB.Query(ctx, query)
@@ -194,10 +141,10 @@ func GetAllCategories(ctx context.Context) ([]CategoryResponse, error) {
 	}
 	defer rows.Close()
 
-	var categories []CategoryResponse
+	var categories []model.CategoryResponse
 
 	for rows.Next() {
-		var category CategoryResponse
+		var category model.CategoryResponse
 		err := rows.Scan(&category.ID, &category.Name)
 		if err != nil {
 			log.Println("Error scanning category:", err)

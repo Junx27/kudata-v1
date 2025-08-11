@@ -1,15 +1,33 @@
 package survey
 
 import (
+	"api/config"
+	"api/event"
+	"api/model"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path/filepath"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/minio/minio-go/v7"
+	"github.com/streadway/amqp"
 )
 
 type Handler struct {
+	cfg     config.Config
+	ch      *amqp.Channel
 	BaseURL string
+}
+
+func NewHandler(cfg config.Config, ch *amqp.Channel, baseURL string) Handler {
+	return Handler{
+		cfg:     cfg,
+		ch:      ch,
+		BaseURL: baseURL,
+	}
 }
 
 func (h *Handler) decodeResponseBody(resp *http.Response) ([]map[string]interface{}, error) {
@@ -59,4 +77,60 @@ func (h *Handler) GetAllSurveyCategories(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, surveys)
+}
+
+func (h *Handler) CreateSurvey(c *gin.Context) {
+	var req model.CreateSurveyRequest
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Ambil file image
+	file, err := c.FormFile("image")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Image is required"})
+		return
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open image"})
+		return
+	}
+	defer src.Close()
+
+	objectName := fmt.Sprintf("survey/%d%s", time.Now().UnixNano(), filepath.Ext(file.Filename))
+
+	_, err = config.MinioClient.PutObject(context.Background(),
+		h.cfg.MinioBucket,
+		objectName,
+		src,
+		file.Size,
+		minio.PutObjectOptions{ContentType: file.Header.Get("Content-Type")},
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image"})
+		return
+	}
+
+	survey := model.MessageSurvey{
+		Name:        req.Name,
+		Price:       req.Price,
+		Description: req.Description,
+		Image:       objectName,
+		CategoryID:  req.CategoryID,
+	}
+
+	surveyData, err := json.Marshal(survey)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Unmarshal error"})
+		return
+	}
+	err = event.Publisher(h.ch, "create.survey", surveyData)
+	c.JSON(http.StatusCreated, gin.H{
+		"message":     "Survey created successfully",
+		"image_path":  objectName,
+		"bucket_name": "images",
+	})
 }
