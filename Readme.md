@@ -8,7 +8,7 @@ docker-compose up --build
 
 ### Mobile view
 
-![Cover](https://raw.githubusercontent.com/Junx27/kudata-v1/main/doc/assets/cover.png)
+![Cover](https://raw.githubusercontent.com/Junx27/kudata-v1/main/doc/assets/mobile_view.jpg)
 
 ### Repository
 
