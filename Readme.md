@@ -9,7 +9,12 @@ The goal of this learning journey is to master microservices design patterns, de
 ### How to run this project?
 
 ```bash
-docker-compose up --build
+docker compose up --build
+```
+
+## How to stop this project?
+```bash
+docker compose down
 ```
 
 ### Features
