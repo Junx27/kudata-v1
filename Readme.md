@@ -46,3 +46,4 @@ flutter run
 ```
 
 created by junx
+email: junxitsumo@gmail.com
